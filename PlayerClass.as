@@ -251,23 +251,15 @@
 				if(!isJumping)
 					hasReachedMaxJump = true;
 					
-				//if(velocityY > MAXFALLSPEED) //No longer need to cap fall speed thanks to Speculative Contacts
+				if(velocityY > MAXFALLSPEED)
 					velocityY = velocityY + gravity;
 					
-				//Get the nearest object beneath the player. If the player is going to fall through it, reduce their velocity(?)
-				nearestObj = collisionDetection.PredictCollisionInDirection(collisionDetection.DOWN);
-				
-				if(nearestObj != null)
+				//Perform Speculative Contacts by checking the ray cast. Prevents player from ghosting through terrian.
+				if(collisionDetection.CheckRayTrace(new Point(playerObject.width/2, playerObject.height + -velocityY), collisionDetection.RAYVERTICAL) == true)
 				{
-					if( y + playerObject.height + -velocityY > nearestObj.y)
-					{
-						//y = nearestObj.y - playerObject.height; //THIS WAS CHEATING.
-						
-						//PROBLEM CAUSED BY THIS. POSSIBLY FROM PredictCollisionInDirection
-						velocityY = (nearestObj.y - (y + playerObject.height)) * -1;
-						trace("Speculative contact - down :" + nearestObj.name);
-					}
+					velocityY = (collisionDetection.RayCollisionObj.y - (y + playerObject.height)) * -1;
 				}
+				
 				y += -velocityY;
 			}
 			else

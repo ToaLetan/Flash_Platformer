@@ -2,13 +2,21 @@
 	import flash.display.MovieClip;
 	import flash.geom.Point;
 	import flash.sampler.NewObjectSample;
+	import mx.core.IFlexAsset;
 	
 	public class PlatformerCollision 
 	{
+		//Directional Constants
 		public const LEFT : Number = -1;
 		public const RIGHT : Number = 1;
 		public const UP : Number = -2;
 		public const DOWN : Number = 2;
+		
+		//Ray Cast Directional Constants
+		public const RAYHORIZONTAL : Number = 0;
+		public const RAYVERTICAL : Number = 1;
+		
+		public var RayCollisionObj : MovieClip = null;
 
 		private var exceptionList : Vector.<String>;
 		
@@ -17,6 +25,8 @@
 		private var owner : MovieClip = null; //The MovieClip that is using this physics script.
 		
 		private var objSpritePos :  Point;
+		
+		private var maxDist : Number = 0;
 		
 		public function PlatformerCollision(obj : MovieClip, objSprite : MovieClip, objExtraBounds : MovieClip) 
 		{
@@ -47,6 +57,73 @@
 			return Math.sqrt( (point1.x - point2.x) * (point1.x - point2.x) + (point1.y - point2.y) * (point1.y - point2.y) );
 		}
 		
+		//public function CheckRayTrace(startPoint : Point, endPoint : Point) : Boolean
+		public function CheckRayTrace(endPoint : Point, rayOrientation : Number = RAYVERTICAL) : Boolean
+		{
+			var collisionResult : Boolean = false;
+			
+			//Generate a movieclip to be used purely for collision detection (thanks to Flash being hella ghetto.)
+			var ray : MovieClip = new MovieClip();
+			
+			//Set up the array of commands for drawPath
+			var commands : Vector.<int> = new Vector.<int>(6, true);
+			commands[0] = 1; //moveTo
+			commands[1] = 2; //lineTo
+			commands[2] = 2; //lineTo
+			commands[3] = 2; //lineTo
+			
+			//Set up the line coords
+			var coords : Vector.<Number> = new Vector.<Number>(8, true);
+			//coords[0] = startPoint.x; //X - Start
+			//coords[1] = startPoint.y; //Y - Start
+			coords[0] = objectSprite.width/2; //X - Start
+			coords[1] = objectSprite.height/2; //Y - Start
+			switch(rayOrientation)
+			{
+				case RAYHORIZONTAL:
+					coords[2] = endPoint.x; //X - End
+					coords[3] = objectSprite.height; //Y - End
+					coords[4] = endPoint.x; //X - End
+					coords[5] = 0; //Y - End
+					break;
+				case RAYVERTICAL:
+					coords[2] = objectSprite.width; //X - End
+					coords[3] = endPoint.y; //Y - End
+					coords[4] = 0; //X - End
+					coords[5] = endPoint.y; //Y - End
+					break;
+			}
+			coords[6] = objectSprite.width/2; //X - Start
+			coords[7] = objectSprite.height/2; //Y - Start
+			
+			
+			ray.graphics.beginFill(0x000000);
+			ray.graphics.lineStyle(3, 0x000000);
+			ray.graphics.drawPath(commands, coords);
+			
+			owner.addChild(ray);
+			
+			//Check if the ray is colliding with an object
+			for(var i : int = 0; i < owner.parent.numChildren; i++)
+			{
+				//PROBLEM: SECOND OBJECT IN LOOP IS NULL
+				
+				//trace(owner.parent.getChildAt(i).name);
+				if(exceptionList.indexOf(owner.parent.getChildAt(i).name) == -1)
+				{
+					if(ray.hitTestObject(owner.parent.getChildAt(i)) )
+					{
+						trace("COLLISION");
+						collisionResult = true;
+						RayCollisionObj = owner.parent.getChildAt(i) as MovieClip;
+					}
+				}
+			}
+			
+			owner.removeChild(ray);
+			return collisionResult;
+		}
+		
 		//Checks if there is a collision in a + direction, can also check if colliding with a specific object
 		public function CheckCollisionDirection(dir : Number) : Boolean
 		{
@@ -63,32 +140,44 @@
 						case UP:
 							if(owner.parent.getChildAt(i).y <= objSpritePos.y && 
 							   (owner.parent.getChildAt(i).x <= objSpritePos.x + objectSprite.width || owner.parent.getChildAt(i).x + owner.parent.getChildAt(i).width >= objSpritePos.x))
-							{
-								isColliding = true;
-								hasObtainedCollision = true;
-							}
+								{
+									if(objectExtraBounds.hitTestObject(owner.parent.getChildAt(i)))
+									{
+										isColliding = true;
+										hasObtainedCollision = true;
+									}
+								}
 							break;
 						case DOWN:
 							if(owner.parent.getChildAt(i).y >= objSpritePos.y + objectSprite.height && 
 							   (owner.parent.getChildAt(i).x <= objSpritePos.x + objectSprite.width || owner.parent.getChildAt(i).x + owner.parent.getChildAt(i).width >= objSpritePos.x))
-							{
-								isColliding = true;
-								hasObtainedCollision = true;
-							}
+								{
+									if(objectExtraBounds.hitTestObject(owner.parent.getChildAt(i)))
+									{
+										isColliding = true;
+										hasObtainedCollision = true;
+									}
+								}
 							break;
 						case LEFT:
 							if(owner.parent.getChildAt(i).x <= objSpritePos.x && owner.parent.getChildAt(i).y < objSpritePos.y)
-							{
-								isColliding = true;
-								hasObtainedCollision = true;
-							}
+								{
+									if(objectExtraBounds.hitTestObject(owner.parent.getChildAt(i)))
+									{
+										isColliding = true;
+										hasObtainedCollision = true;
+									}
+								}
 							break;
 						case RIGHT:
 							if(owner.parent.getChildAt(i).x >= objSpritePos.x && owner.parent.getChildAt(i).y < objSpritePos.y )
-							{
-								isColliding = true;
-								hasObtainedCollision = true;
-							}
+								{
+									if(objectExtraBounds.hitTestObject(owner.parent.getChildAt(i)))
+									{
+										isColliding = true;
+										hasObtainedCollision = true;
+									}
+								}
 							break;
 						default:
 							break;
@@ -119,7 +208,8 @@
 					{
 						case UP:
 						//If the object is above the search point and within the max search range
-							if(currentObj.y + currentObj.height <= owner.y)
+							if(currentObj.y + currentObj.height <= owner.y && 
+							   currentObj.y + currentObj.height >= owner.y + maxDist)
 							{
 								if(CheckBounds(owner, currentObj, "x") == true)
 								{
@@ -131,7 +221,8 @@
 						case DOWN:
 						//If the object is below the search point and within the max search range
 							//if(currentObj.y >= searchPoint.y && currentObj.y <= searchPoint.y + maxDist.y)
-							if(currentObj.y >= owner.y + objectSprite.height)
+							if(currentObj.y >= owner.y + objectSprite.height &&
+							   	currentObj.y <= owner.y + objectSprite.height + maxDist)
 							{
 								if(CheckBounds(owner, currentObj, "x")  == true)
 								{
@@ -174,29 +265,37 @@
 					
 					if(isInRange == true)
 					{
-						//Calculate the middle point of both the subject object and the searched object.
-						var fullObjectMidX : Number = owner.x + (owner.width / 2);
-						var currObjectMidX : Number = currentObj.x + (currentObj.width / 2);
+						//PROBLEM EXISTS HERE:
+						//The method of comparing the shortest distance is not optimal.
 						
-						if (GetDistance(new Point(fullObjectMidX, owner.y), new Point(currObjectMidX, owner.y)) < closestDist || isTouchingObj == true )
+						//Calculate the middle point of the owner object
+						var ownerObjectMidX : Number = owner.x + (owner.width / 2);
+						
+						//Get the left, right and middle points of the current object
+						var currObjectLeft : Number = currentObj.x;
+						var currObjectMidX : Number = currentObj.x + (currentObj.width / 2);
+						var currObjectRight : Number = currentObj.x + currentObj.width;
+						
+						//Compare the distances between the owner and the three points. Get the shortest distance of the three.
+						var distLeft : Number = GetDistance(new Point(ownerObjectMidX, owner.y), new Point(currObjectLeft, currentObj.y) );
+						var distMid : Number = GetDistance(new Point(ownerObjectMidX, owner.y), new Point(currObjectMidX, currentObj.y) );
+						var distRight : Number = GetDistance(new Point(ownerObjectMidX, owner.y), new Point(currObjectRight, currentObj.y) );
+						
+						if(distLeft < closestDist || isTouchingObj == true)
+							tempDistClosest = distLeft;
+						if(distMid < closestDist || isTouchingObj == true)
+							tempDistClosest = distMid;
+						if(distRight < closestDist || isTouchingObj == true)
+							tempDistClosest = distRight;
+							
+						if(tempDistClosest < closestDist)
 						{
-							tempDistClosest = GetDistance(new Point(fullObjectMidX, owner.y), new Point(currObjectMidX, currentObj.y) );
-							
-							//if(tempDistClosest < 0)
-								//tempDistClosest *= -1;
-							
-							if(tempDistClosest < closestDist)
-							{
-								closestDist = tempDistClosest;
-								closestObj = owner.parent.getChildAt(i) as MovieClip;
-							}
+							closestDist = tempDistClosest;
+							closestObj = owner.parent.getChildAt(i) as MovieClip;
 						}
 					}
 				}
 			}
-			if(closestObj != null)
-				closestObj.alpha = 0.5; //DISPLAYING THE CLOSEST OBJECT TO THE PLAYER
-				
 			return closestObj;
 		}
 		
