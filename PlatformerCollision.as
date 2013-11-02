@@ -15,6 +15,7 @@
 		//Ray Cast Directional Constants
 		public const RAYHORIZONTAL : Number = 0;
 		public const RAYVERTICAL : Number = 1;
+		public const RAYWIDTHOFFSET : Number = 2; //Offset the size of the raycast by 2 pixels.
 		
 		public var RayCollisionObj : MovieClip = null;
 
@@ -82,14 +83,14 @@
 			{
 				case RAYHORIZONTAL:
 					coords[2] = endPoint.x; //X - End
-					coords[3] = objectSprite.height; //Y - End
+					coords[3] = objectSprite.height - RAYWIDTHOFFSET; //Y - End
 					coords[4] = endPoint.x; //X - End
-					coords[5] = 0; //Y - End
+					coords[5] = RAYWIDTHOFFSET; //Y - End
 					break;
 				case RAYVERTICAL:
-					coords[2] = objectSprite.width; //X - End
+					coords[2] = objectSprite.width - RAYWIDTHOFFSET; //X - End
 					coords[3] = endPoint.y; //Y - End
-					coords[4] = 0; //X - End
+					coords[4] = RAYWIDTHOFFSET; //X - End
 					coords[5] = endPoint.y; //Y - End
 					break;
 			}
@@ -98,7 +99,7 @@
 			
 			
 			ray.graphics.beginFill(0x000000);
-			ray.graphics.lineStyle(3, 0x000000);
+			ray.graphics.lineStyle(1, 0x000000);
 			ray.graphics.drawPath(commands, coords);
 			
 			owner.addChild(ray);
@@ -106,14 +107,10 @@
 			//Check if the ray is colliding with an object
 			for(var i : int = 0; i < owner.parent.numChildren; i++)
 			{
-				//PROBLEM: SECOND OBJECT IN LOOP IS NULL
-				
-				//trace(owner.parent.getChildAt(i).name);
 				if(exceptionList.indexOf(owner.parent.getChildAt(i).name) == -1)
 				{
 					if(ray.hitTestObject(owner.parent.getChildAt(i)) )
 					{
-						trace("COLLISION");
 						collisionResult = true;
 						RayCollisionObj = owner.parent.getChildAt(i) as MovieClip;
 					}
@@ -186,117 +183,6 @@
 			}
 			
 			return isColliding;
-		}
-		
-		public function PredictCollisionInDirection(direction : Number) : MovieClip
-		{
-			var currentObj : MovieClip = null;
-			var closestObj : MovieClip = null;
-			var closestDist : Number = 500;
-			var tempDistLeft : Number = 0;
-			var tempDistRight : Number = 0;
-			var tempDistClosest : Number = 0;
-			var isInRange : Boolean = false;
-			var isTouchingObj : Boolean = false;
-			
-			for(var i : int = 0; i < owner.parent.numChildren; i++)
-			{
-				if(exceptionList.indexOf(owner.parent.getChildAt(i).name) == -1)
-				{
-					currentObj = owner.parent.getChildAt(i) as MovieClip;
-					switch(direction)
-					{
-						case UP:
-						//If the object is above the search point and within the max search range
-							if(currentObj.y + currentObj.height <= owner.y && 
-							   currentObj.y + currentObj.height >= owner.y + maxDist)
-							{
-								if(CheckBounds(owner, currentObj, "x") == true)
-								{
-									isInRange = true;
-									isTouchingObj = CheckCollisionDirection(UP);
-								 }
-							}
-							break;
-						case DOWN:
-						//If the object is below the search point and within the max search range
-							//if(currentObj.y >= searchPoint.y && currentObj.y <= searchPoint.y + maxDist.y)
-							if(currentObj.y >= owner.y + objectSprite.height &&
-							   	currentObj.y <= owner.y + objectSprite.height + maxDist)
-							{
-								if(CheckBounds(owner, currentObj, "x")  == true)
-								{
-									isInRange = true;
-									isTouchingObj = CheckCollisionDirection(DOWN);
-								}
-							}
-							break;
-						case LEFT:
-						//If the object is to the left of the search point and within the max search range
-							//if(currentObj.x <= searchPoint.x && currentObj.x >= searchPoint.x + maxDist.x)
-							if(currentObj.x <= owner.x)
-							{
-								//if(searchPoint.y <= currentObj.y && searchPoint.y >= currentObj.y + currentObj.height)
-								if(owner.y <= currentObj.y && owner.y >= currentObj.y + currentObj.height)
-								   {
-										isInRange = true;
-										isTouchingObj = CheckCollisionDirection(LEFT);
-										trace("LEFT");
-								   }
-							}
-							break;
-						case RIGHT:
-						//If the object is to the right of the search point and within the max search range
-							//if(currentObj.x >= searchPoint.x && currentObj.x <= searchPoint.x + maxDist.x)
-							if(currentObj.x >= owner.x)
-							{
-								//if(searchPoint.y <= currentObj.y && searchPoint.y >= currentObj.y + currentObj.height)
-								if(owner.y <= currentObj.y && owner.y >= currentObj.y + currentObj.height)
-								   {
-										isInRange = true;
-										isTouchingObj = CheckCollisionDirection(RIGHT);
-										trace("RIGHT");
-								   }
-							}
-							break;
-						default:
-							trace("[ERROR] INVALID AXIS SELECTED");
-					}
-					
-					if(isInRange == true)
-					{
-						//PROBLEM EXISTS HERE:
-						//The method of comparing the shortest distance is not optimal.
-						
-						//Calculate the middle point of the owner object
-						var ownerObjectMidX : Number = owner.x + (owner.width / 2);
-						
-						//Get the left, right and middle points of the current object
-						var currObjectLeft : Number = currentObj.x;
-						var currObjectMidX : Number = currentObj.x + (currentObj.width / 2);
-						var currObjectRight : Number = currentObj.x + currentObj.width;
-						
-						//Compare the distances between the owner and the three points. Get the shortest distance of the three.
-						var distLeft : Number = GetDistance(new Point(ownerObjectMidX, owner.y), new Point(currObjectLeft, currentObj.y) );
-						var distMid : Number = GetDistance(new Point(ownerObjectMidX, owner.y), new Point(currObjectMidX, currentObj.y) );
-						var distRight : Number = GetDistance(new Point(ownerObjectMidX, owner.y), new Point(currObjectRight, currentObj.y) );
-						
-						if(distLeft < closestDist || isTouchingObj == true)
-							tempDistClosest = distLeft;
-						if(distMid < closestDist || isTouchingObj == true)
-							tempDistClosest = distMid;
-						if(distRight < closestDist || isTouchingObj == true)
-							tempDistClosest = distRight;
-							
-						if(tempDistClosest < closestDist)
-						{
-							closestDist = tempDistClosest;
-							closestObj = owner.parent.getChildAt(i) as MovieClip;
-						}
-					}
-				}
-			}
-			return closestObj;
 		}
 		
 		private function CheckBounds(object1 : MovieClip, object2 : MovieClip, axis : String) : Boolean
