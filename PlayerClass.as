@@ -20,10 +20,8 @@
 		public var ResetKey : uint = Keyboard.R;
 		
 		private const MAXVELOCITY : Number = 15;
-		private const MINJUMPVELOCITY : Number = 10;
-		private const MAXJUMPVELOCITY : Number = 30;
-		private const MINJUMPHEIGHT : Number = MINJUMPVELOCITY;
-		private const MAXJUMPHEIGHT : Number = 65;
+		private const JUMPVELOCITY : Number = 15;
+		private const MAXJUMPHEIGHT : Number = JUMPVELOCITY * 10;
 		private const MAXFALLSPEED : Number = -50;
 		
 		private const DETECTIONOFFSET : Number = 10;
@@ -31,12 +29,6 @@
 		//Player terrain states.
 		private const ONGROUND : Number = 0;
 		private const MIDAIR : Number = 1;
-		
-		//Player jump states.
-		private const JUMPSTARTED : Number = 0;
-		private const JUMPMID : Number = 1;
-		private const JUMPFINISHED : Number = 2;
-		private const DONEJUMP : Number = 3;
 		
 		private var collisionDetection : PlatformerCollision = null;
 		
@@ -64,10 +56,11 @@
 		private var pressedLeftKey : Boolean = false;
 		private var pressedRightKey : Boolean = false;
 		private var pressedJumpKey : Boolean = false;
+		private var releasedJumpKey : Boolean = true; //Used to prevent jump spamming
 		private var pressedResetKey : Boolean = false;
 		
 		private var isJumping : Boolean = false;
-		private var hasReachedMaxJump : Boolean = false;
+		private var applyGravity : Boolean = true;
 		
 		public function PlayerClass()
 		{
@@ -85,8 +78,6 @@
 			
 			accelerationY = 5;
 			gravity = -1 * accelerationY;
-			
-			currentJumpState = DONEJUMP;
 			
 			resetPos = new Point(x, y);
 			
@@ -110,17 +101,14 @@
 				currentDirectionX = collisionDetection.LEFT;
 			if(pressedRightKey)
 				currentDirectionX = collisionDetection.RIGHT;
-			if(pressedJumpKey && currentJumpState == DONEJUMP)
+				
+			if(pressedJumpKey && releasedJumpKey && !isJumping && currentMovementState == ONGROUND)
 			{
 				isJumping = true;
+				applyGravity = false;
+				releasedJumpKey = false;
 				prevY = y;
-				currentJumpState = JUMPSTARTED;
-				velocityY = MAXJUMPVELOCITY;
-			}
-			if(!pressedJumpKey && isJumping)
-			{
-				isJumping = false;
-				hasReachedMaxJump = true;
+				velocityY = JUMPVELOCITY;
 			}
 			if(pressedResetKey)
 			{
@@ -167,6 +155,7 @@
 					break;
 				case JumpKey:
 					pressedJumpKey = false;
+					releasedJumpKey = true;
 					break;
 				case ResetKey:
 					pressedResetKey = false;
@@ -206,13 +195,13 @@
 				case collisionDetection.LEFT:
 					if(collisionDetection.CheckRayTrace(new Point(-velocityX, playerObject.height/2), collisionDetection.RAYHORIZONTAL) == true)
 					{
-						velocityX = x - (collisionDetection.RayCollisionObj.x + collisionDetection.RayCollisionObj.width);
+						velocityX = x - (collisionDetection.ObjectCollidingWith.x + collisionDetection.ObjectCollidingWith.width);
 					}
 					break;
 				case collisionDetection.RIGHT:
 					if(collisionDetection.CheckRayTrace(new Point(playerObject.width + velocityX, playerObject.height/2), collisionDetection.RAYHORIZONTAL) == true)
 					{
-						velocityX = collisionDetection.RayCollisionObj.x - (x + playerObject.width);
+						velocityX = collisionDetection.ObjectCollidingWith.x - (x + playerObject.width);
 					}
 					break;
 			}
@@ -223,62 +212,51 @@
 		
 		private function PlayerJump() : void
 		{
-			switch(currentJumpState)
+			if(distTravelledY >= MAXJUMPHEIGHT || !pressedJumpKey)
 			{
-				case JUMPSTARTED:
-					velocityY = MINJUMPVELOCITY;
-					if(!pressedJumpKey || distTravelledY >= MINJUMPHEIGHT)
-					{
-						velocityY = MAXJUMPVELOCITY;
-						currentJumpState = JUMPMID;
-					}
-					break;
-				case JUMPMID:
-					velocityY -= accelerationY * 0.25;
-					if(!pressedJumpKey || distTravelledY >= MAXJUMPHEIGHT)
-						currentJumpState = JUMPFINISHED;
-					break;
-				case JUMPFINISHED:
-					velocityY = 0;
-					isJumping = false;
-					break;
+				isJumping = false;
+				applyGravity = true;
 			}
-			//Speculative contact check upwards
-			if(collisionDetection.CheckRayTrace(new Point(playerObject.width/2, -velocityY), collisionDetection.RAYVERTICAL) == true &&
-			   collisionDetection.RayCollisionObj.y < y)
+			else
 			{
-				velocityY = (collisionDetection.RayCollisionObj.y + collisionDetection.RayCollisionObj.height - y) * -1;
+				velocityY = JUMPVELOCITY;
+				
+				//Speculative contact check upwards
+				if(collisionDetection.CheckRayTrace(new Point(playerObject.width/2, -velocityY), collisionDetection.RAYVERTICAL) == true &&
+				   collisionDetection.ObjectCollidingWith.y < y)
+				{
+					velocityY = (collisionDetection.ObjectCollidingWith.y + collisionDetection.ObjectCollidingWith.height - y) * -1;
+				}
+				y += -velocityY;
+				
+				distTravelledY += (prevY - y);
+				
+				prevY = y;
 			}
-			y += -velocityY;
-			
-			distTravelledY += (prevY - y);
-			
-			prevY = y;
 		}
 		
 		private function ApplyGravity() : void
 		{
-			if(currentMovementState == MIDAIR)
+			if(currentMovementState == MIDAIR && applyGravity)
 			{
-				if(!isJumping)
-					hasReachedMaxJump = true;
-					
 				if(velocityY > MAXFALLSPEED)
+				{
 					velocityY = velocityY + gravity;
+				}
 					
 				//Speculative Contacts for both above and below the player.
 				//Perform Speculative Contacts by checking the ray cast. Prevents player from ghosting through terrian.
 				if(collisionDetection.CheckRayTrace(new Point(playerObject.width/2, playerObject.height + -velocityY), collisionDetection.RAYVERTICAL) == true &&
-			   		collisionDetection.RayCollisionObj.y > y + playerObject.height)
+			   		collisionDetection.ObjectCollidingWith.y > y + playerObject.height)
 				{
-					velocityY = (collisionDetection.RayCollisionObj.y - (y + playerObject.height)) * -1;
+					velocityY = (collisionDetection.ObjectCollidingWith.y - (y + playerObject.height)) * -1;
 				}
 				
 				//Perform Speculative Contacts by checking the ray cast. Prevents player from ghosting through terrian.
 				if(collisionDetection.CheckRayTrace(new Point(playerObject.width/2, -velocityY), collisionDetection.RAYVERTICAL) == true &&
-			   collisionDetection.RayCollisionObj.y < y)
+			   collisionDetection.ObjectCollidingWith.y < y)
 				{
-					velocityY = (collisionDetection.RayCollisionObj.y + collisionDetection.RayCollisionObj.height - y) * -1;
+					velocityY = (collisionDetection.ObjectCollidingWith.y + collisionDetection.ObjectCollidingWith.height - y) * -1;
 				}
 				
 				y += -velocityY;
@@ -286,7 +264,7 @@
 			else
 			{
 				velocityY = 0;
-				hasReachedMaxJump = false;
+				applyGravity = true;
 			}
 			collisionDetection.UpdatePosition();
 		}
@@ -298,19 +276,13 @@
 						currentMovementState = ONGROUND;
 						if(distTravelledY != 0)
 							distTravelledY = 0;
-						if(currentJumpState != DONEJUMP)
-							currentJumpState = DONEJUMP;
-						//beneathBlock = collisionDetection.PredictCollisionInDirection(collisionDetection.DOWN);
+						//beneathBlock = collisionDetection.ObjectCollidingWith;
 				}
-				if(!collisionDetection.CheckCollisionDirection(collisionDetection.DOWN) )
+				//if(!collisionDetection.CheckCollisionDirection(collisionDetection.DOWN) )
+				else
 				{
 						currentMovementState = MIDAIR;
 				}
-				/*if(collisionDetection.CheckCollisionDirection(collisionDetection.UP) && isJumping)
-				{
-					hasReachedMaxJump = true;
-					isJumping = false;
-				}*/
 				
 			ApplyGravity();
 		}

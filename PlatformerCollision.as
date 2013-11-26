@@ -1,8 +1,6 @@
 ﻿package  {
 	import flash.display.MovieClip;
 	import flash.geom.Point;
-	import flash.sampler.NewObjectSample;
-	import mx.core.IFlexAsset;
 	
 	public class PlatformerCollision 
 	{
@@ -17,7 +15,7 @@
 		public const RAYVERTICAL : Number = 1;
 		public const RAYWIDTHOFFSET : Number = 2; //Offset the size of the raycast by 2 pixels.
 		
-		public var RayCollisionObj : MovieClip = null;
+		public var ObjectCollidingWith : MovieClip = null;
 
 		private var exceptionList : Vector.<String>;
 		
@@ -112,7 +110,7 @@
 					if(ray.hitTestObject(owner.parent.getChildAt(i)) )
 					{
 						collisionResult = true;
-						RayCollisionObj = owner.parent.getChildAt(i) as MovieClip;
+						ObjectCollidingWith = owner.parent.getChildAt(i) as MovieClip;
 					}
 				}
 			}
@@ -142,6 +140,7 @@
 									{
 										isColliding = true;
 										hasObtainedCollision = true;
+										ObjectCollidingWith = owner.parent.getChildAt(i) as MovieClip;
 									}
 								}
 							break;
@@ -153,6 +152,7 @@
 									{
 										isColliding = true;
 										hasObtainedCollision = true;
+										ObjectCollidingWith = owner.parent.getChildAt(i) as MovieClip;
 									}
 								}
 							break;
@@ -163,6 +163,7 @@
 									{
 										isColliding = true;
 										hasObtainedCollision = true;
+										ObjectCollidingWith = owner.parent.getChildAt(i) as MovieClip;
 									}
 								}
 							break;
@@ -173,6 +174,7 @@
 									{
 										isColliding = true;
 										hasObtainedCollision = true;
+										ObjectCollidingWith = owner.parent.getChildAt(i) as MovieClip;
 									}
 								}
 							break;
